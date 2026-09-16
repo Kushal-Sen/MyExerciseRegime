@@ -114,7 +114,7 @@
 <header>
   <div class="kicker">TRAINING PLAN</div>
   <h1>Kushal's Weekly Split</h1>
-  <div class="sub">Tap an exercise to see the movement and target weight. Mark each day done and the plan keeps rotating from wherever you actually left off.</div>
+  <div class="sub">Tap an exercise to see the movement and target weight. Today's day is picked automatically — Saturday through Thursday are training days, Friday is rest.</div>
 </header>
 
 <div class="banner" id="banner"></div>
@@ -148,7 +148,7 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw) return JSON.parse(raw);
   }catch(e){}
-  const fresh = {pointer:0, history:{}, startDate: todayStr()};
+  const fresh = {history:{}, startDate: todayStr()};
   saveState(fresh);
   return fresh;
 }
@@ -165,10 +165,19 @@ const tabsEl = document.getElementById('tabs');
 const viewsEl = document.getElementById('views');
 const bannerEl = document.getElementById('banner');
 
-function dayIndex(id){ return ROTATION.indexOf(id); }
+// One-off overrides for this transition week only: Mon/Tue were already
+// logged as D1/D2 under the old rotation, so Wed/Thu finish out as D3/D4
+// before the fixed weekly schedule below takes over from Saturday onward.
+const SCHEDULE_OVERRIDES = { '2026-09-16': 'd3', '2026-09-17': 'd4' };
+// Permanent weekly schedule: Friday is always rest, Saturday always starts
+// the cycle at Day 1, so which day it is never needs to be tracked by hand.
+const WEEKDAY_SCHEDULE = { 5:'rest', 6:'d1', 0:'d2', 1:'d3', 2:'d4', 3:'d5', 4:'d6' };
+function scheduledDayFor(date){
+  return SCHEDULE_OVERRIDES[fmtDate(date)] || WEEKDAY_SCHEDULE[date.getDay()];
+}
 
 function renderBanner(){
-  const upNext = ROTATION[STATE.pointer];
+  const upNext = scheduledDayFor(new Date());
   const done = STATE.history[todayStr()];
   if(done){
     bannerEl.innerHTML = `<div><div class="bl">Today, logged</div><div class="bt">${SHORT[done.dayId]} — ${LABELS[done.dayId]||''}</div></div><button onclick="selectTab('${done.dayId}')">View</button>`;
@@ -191,7 +200,7 @@ function renderTabs(){
     btn.className = 'tab' + (isActive?' active':'') + (t.rest?' rest':'');
     btn.dataset.target = t.id;
     btn.innerHTML = (t.num? `<span class="n">${t.num}</span>`:'') + t.label;
-    if(ROTATION.includes(t.id) && ROTATION[STATE.pointer]===t.id && !STATE.history[todayStr()]){
+    if(ROTATION.includes(t.id) && scheduledDayFor(new Date())===t.id && !STATE.history[todayStr()]){
       btn.innerHTML += '<span class="dot"></span>';
     }
     btn.onclick = () => selectTab(t.id);
@@ -363,7 +372,7 @@ function renderAll(){
   viewsEl.appendChild(trackV);
 }
 
-let currentTab = 'd1';
+let currentTab = scheduledDayFor(new Date());
 function selectTab(id){
   currentTab = id;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.target===id));
@@ -376,10 +385,8 @@ function toggleDone(dayId){
   const entry = STATE.history[ts];
   if(entry && entry.dayId === dayId){
     delete STATE.history[ts];
-    STATE.pointer = dayIndex(dayId);
   } else {
     STATE.history[ts] = {dayId: dayId};
-    STATE.pointer = (dayIndex(dayId) + 1) % ROTATION.length;
   }
   saveState(STATE);
   renderAll();
@@ -394,7 +401,7 @@ function changeMonth(delta){
 
 function resetProgress(){
   if(confirm('This clears all logged days and resets the rotation to Day 1. Continue?')){
-    STATE = {pointer:0, history:{}, startDate: todayStr()};
+    STATE = {history:{}, startDate: todayStr()};
     saveState(STATE);
     renderAll();
     selectTab('calendar');
