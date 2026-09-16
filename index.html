@@ -114,7 +114,7 @@
 <header>
   <div class="kicker">TRAINING PLAN</div>
   <h1>Kushal's Weekly Split</h1>
-  <div class="sub">Tap an exercise to see the movement and target weight. Today's day is picked automatically — Saturday through Thursday are training days, Friday is rest.</div>
+  <div class="sub">Tap an exercise to see the movement and target weight. Today's day is picked automatically — Thursday through Tuesday are training days, Wednesday is rest.</div>
 </header>
 
 <div class="banner" id="banner"></div>
@@ -165,15 +165,11 @@ const tabsEl = document.getElementById('tabs');
 const viewsEl = document.getElementById('views');
 const bannerEl = document.getElementById('banner');
 
-// One-off overrides for this transition week only: Mon/Tue were already
-// logged as D1/D2 under the old rotation, so Wed/Thu finish out as D3/D4
-// before the fixed weekly schedule below takes over from Saturday onward.
-const SCHEDULE_OVERRIDES = { '2026-09-16': 'd3', '2026-09-17': 'd4' };
-// Permanent weekly schedule: Friday is always rest, Saturday always starts
+// Permanent weekly schedule: Wednesday is always rest, Thursday always starts
 // the cycle at Day 1, so which day it is never needs to be tracked by hand.
-const WEEKDAY_SCHEDULE = { 5:'rest', 6:'d1', 0:'d2', 1:'d3', 2:'d4', 3:'d5', 4:'d6' };
+const WEEKDAY_SCHEDULE = { 3:'rest', 4:'d1', 5:'d2', 6:'d3', 0:'d4', 1:'d5', 2:'d6' };
 function scheduledDayFor(date){
-  return SCHEDULE_OVERRIDES[fmtDate(date)] || WEEKDAY_SCHEDULE[date.getDay()];
+  return WEEKDAY_SCHEDULE[date.getDay()];
 }
 
 function renderBanner(){
