@@ -122,7 +122,9 @@
   @media (max-width:380px){ .f2f-sticker{transform:scale(0.68);transform-origin:top right;} }
 
   #runner-track{position:fixed;left:0;top:0;width:100%;height:0;z-index:11;pointer-events:none;}
-  .runner{position:absolute;bottom:0;left:-80px;width:58px;height:58px;transform:translateX(-50%);pointer-events:none;}
+  .runner{position:absolute;bottom:0;left:-80px;width:58px;height:58px;transform:translateX(-50%);pointer-events:auto;cursor:default;}
+  .runner.jumping{animation:jumpArc 0.45s ease-out;}
+  @keyframes jumpArc{0%{transform:translate(-50%,0);}40%{transform:translate(-50%,-34px);}70%{transform:translate(-50%,-34px);}100%{transform:translate(-50%,0);}}
   .runner svg{display:block;width:100%;height:100%;overflow:visible;}
 
   .runner .body{fill:var(--accent-dim);stroke:var(--accent);stroke-width:2;}
@@ -540,6 +542,12 @@ renderAll();
   const runner = document.getElementById('runner');
   const navEl = document.getElementById('tabs');
   if(!track || !runner || !navEl) return;
+
+  runner.addEventListener('mouseenter', () => {
+    if(runner.classList.contains('jumping')) return;
+    runner.classList.add('jumping');
+    setTimeout(()=>runner.classList.remove('jumping'), 450);
+  });
 
   const FINISH_PCT = 0.82; // must match #finish-line's CSS `left`
   const FIREWORK_COLORS = ['var(--accent)','var(--amber)','#ff6b6b','#7fd8ff','#ffd166'];
