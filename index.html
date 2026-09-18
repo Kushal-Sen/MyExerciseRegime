@@ -133,8 +133,14 @@
   .runner .eye{fill:#211814;}
   .runner .blush{fill:#ff9d9d;opacity:0.55;}
   .runner .mouth{fill:none;stroke:#6b3f2c;stroke-width:1.3;stroke-linecap:round;}
+  .runner .nose{fill:#e2b98d;}
   .runner .shoe{fill:#20242a;}
   .runner .hand{fill:#f2cda3;}
+
+  .runner .face-side{opacity:1;transition:opacity 0.25s ease;}
+  .runner .face-front{opacity:0;transition:opacity 0.25s ease;}
+  .runner.waving .face-side{opacity:0;}
+  .runner.waving .face-front{opacity:1;}
 
   .runner .leg-back{transform-origin:30px 40px;animation:legSwing 0.42s ease-in-out infinite;}
   .runner .leg-front{transform-origin:30px 40px;animation:legSwing 0.42s ease-in-out infinite reverse;}
@@ -144,10 +150,18 @@
   .runner .leg-front line{stroke:var(--ink-dim);stroke-width:6;stroke-linecap:round;fill:none;}
   .runner .arm-back line{stroke:var(--muted);stroke-width:5;stroke-linecap:round;fill:none;}
   .runner .arm-front line{stroke:var(--ink);stroke-width:5;stroke-linecap:round;fill:none;}
-  .runner.tapping .arm-front{animation:armTap 0.62s ease-in-out;}
+  .runner.waving .arm-front{animation:armWave 1.3s ease-in-out;}
   @keyframes legSwing{0%{transform:rotate(24deg);}50%{transform:rotate(-24deg);}100%{transform:rotate(24deg);}}
   @keyframes armSwing{0%{transform:rotate(-18deg);}50%{transform:rotate(18deg);}100%{transform:rotate(-18deg);}}
-  @keyframes armTap{0%{transform:rotate(18deg);}30%{transform:rotate(-155deg);}55%{transform:rotate(-165deg);}100%{transform:rotate(18deg);}}
+  @keyframes armWave{
+    0%{transform:rotate(18deg);}
+    15%{transform:rotate(-150deg);}
+    30%{transform:rotate(-115deg);}
+    45%{transform:rotate(-150deg);}
+    60%{transform:rotate(-115deg);}
+    75%{transform:rotate(-150deg);}
+    100%{transform:rotate(18deg);}
+  }
 
   #finish-line{position:absolute;left:82%;bottom:0;transform:translateX(-50%);width:66px;height:0;pointer-events:none;}
   .finish-pole{position:absolute;bottom:0;width:3px;height:34px;background:var(--ink-dim);border-radius:2px;}
@@ -155,8 +169,10 @@
   .finish-pole-r{left:63px;}
   .finish-banner{position:absolute;bottom:30px;left:0;width:66px;text-align:center;background:var(--accent);color:#12160e;font-size:10px;font-weight:800;padding:3px 0;border-radius:3px;letter-spacing:0.02em;transform:rotate(-2deg);box-shadow:0 2px 6px rgba(0,0,0,0.4);}
   .finish-checker{position:absolute;bottom:-4px;left:-2px;width:70px;height:8px;border-radius:2px;background:repeating-linear-gradient(90deg,#111 0 8px,#eee 8px 16px);}
-  .spark{position:absolute;bottom:0;left:0;width:6px;height:6px;border-radius:50%;pointer-events:none;animation:sparkPop 0.7s ease-out forwards;}
+  .spark{position:absolute;bottom:0;left:0;width:6px;height:6px;border-radius:50%;pointer-events:none;animation:sparkPop 0.85s ease-out forwards;}
   @keyframes sparkPop{0%{transform:translate(0,0) scale(1);opacity:1;}100%{transform:translate(var(--dx),var(--dy)) scale(0.3);opacity:0;}}
+  .burst-ring{position:absolute;width:14px;height:14px;border-radius:50%;border:3px solid;pointer-events:none;animation:ringPop 0.55s ease-out forwards;}
+  @keyframes ringPop{0%{transform:scale(0.3);opacity:0.9;}100%{transform:scale(3.4);opacity:0;}}
 </style>
 </head>
 <body>
@@ -204,11 +220,19 @@
     <circle class="head" cx="30" cy="15" r="11"/>
     <path class="hair" d="M18,11 Q19,-3 30,1 Q41,-3 42,11 Q36,4 30,6 Q24,4 18,11 Z"/>
     <rect class="band" x="18.5" y="8.5" width="23" height="3" rx="1.5"/>
-    <circle class="eye" cx="26" cy="16" r="1.6"/>
-    <circle class="eye" cx="34" cy="16" r="1.6"/>
-    <circle class="blush" cx="22.5" cy="19.5" r="2"/>
-    <circle class="blush" cx="37.5" cy="19.5" r="2"/>
-    <path class="mouth" d="M27,20.5 Q30,22.5 33,20.5"/>
+    <g class="face-side">
+      <path class="nose" d="M40,14.5 Q44,16 40,17.5 Z"/>
+      <circle class="eye" cx="35" cy="16" r="1.6"/>
+      <circle class="blush" cx="37.5" cy="19.5" r="2"/>
+      <path class="mouth" d="M37,20.5 Q39.5,22 42,20.5"/>
+    </g>
+    <g class="face-front">
+      <circle class="eye" cx="26" cy="16" r="1.6"/>
+      <circle class="eye" cx="34" cy="16" r="1.6"/>
+      <circle class="blush" cx="22.5" cy="19.5" r="2"/>
+      <circle class="blush" cx="37.5" cy="19.5" r="2"/>
+      <path class="mouth" d="M27,20.5 Q30,22.5 33,20.5"/>
+    </g>
     <g class="arm-front">
       <line x1="39" y1="28" x2="49" y2="17"/>
       <circle class="hand" cx="50" cy="16" r="4"/>
@@ -502,11 +526,13 @@ function resetProgress(){
 renderAll();
 
 // 10K-steps mascot: a jogger running along the sticky nav's bottom border,
-// pace wobbling via two overlaid sine waves (never stops/reverses — min stays
-// positive), wrapping to the left edge once he exits the right, and raising
-// a hand to "tap" every few seconds along the way (cosmetic only, no click).
-// Each time he crosses the "10,000" finish banner, a short firework burst
-// fires at that spot, then he keeps running and looping as normal.
+// facing right by default (single-eye/nose profile face), pace wobbling via
+// two overlaid sine waves (never stops/reverses — min stays positive), and
+// wrapping to the left edge once he exits the right. Every several seconds
+// he briefly turns to face the viewer (swaps to the two-eyed front face) and
+// waves, then turns back and keeps running. Each time he crosses the
+// "10,000" finish banner, a short firework burst fires at that spot, then
+// he keeps running and looping as normal.
 (function(){
   const track = document.getElementById('runner-track');
   const runner = document.getElementById('runner');
@@ -516,35 +542,60 @@ renderAll();
   const FINISH_PCT = 0.82; // must match #finish-line's CSS `left`
   const FIREWORK_COLORS = ['var(--accent)','var(--amber)','#ff6b6b','#7fd8ff','#ffd166'];
 
-  function fireworks(atX, atY){
-    for(let i=0;i<14;i++){
+  function burst(atX, atY, count, spreadMin, spreadMax){
+    for(let i=0;i<count;i++){
       const s = document.createElement('div');
       s.className = 'spark';
       const angle = Math.random()*Math.PI*2;
-      const dist = 22 + Math.random()*32;
+      const dist = spreadMin + Math.random()*(spreadMax-spreadMin);
       s.style.setProperty('--dx', (Math.cos(angle)*dist) + 'px');
       s.style.setProperty('--dy', (Math.sin(angle)*dist - 18) + 'px'); // biased upward
-      s.style.left = atX + 'px';
-      s.style.bottom = atY + 'px';
+      const size = 4 + Math.random()*5;
+      s.style.width = size + 'px';
+      s.style.height = size + 'px';
+      s.style.left = (atX - size/2) + 'px';
+      s.style.bottom = (atY - size/2) + 'px';
       s.style.background = FIREWORK_COLORS[i % FIREWORK_COLORS.length];
-      s.style.animationDelay = (Math.random()*0.06) + 's';
+      s.style.animationDelay = (Math.random()*0.08) + 's';
       track.appendChild(s);
-      setTimeout(()=>s.remove(), 800);
+      setTimeout(()=>s.remove(), 950);
     }
+    const ring = document.createElement('div');
+    ring.className = 'burst-ring';
+    ring.style.left = (atX-7) + 'px';
+    ring.style.bottom = (atY-7) + 'px';
+    ring.style.borderColor = FIREWORK_COLORS[Math.floor(Math.random()*FIREWORK_COLORS.length)];
+    track.appendChild(ring);
+    setTimeout(()=>ring.remove(), 600);
+  }
+
+  // A grander celebration: three staggered pops radiating from the finish
+  // banner instead of one, so it reads as a small fireworks show, not a blip.
+  function fireworks(atX, atY){
+    burst(atX, atY, 22, 26, 48);
+    setTimeout(()=>burst(atX + (Math.random()*16-8), atY + 16 + Math.random()*10, 16, 20, 38), 140);
+    setTimeout(()=>burst(atX + (Math.random()*16-8), atY + 6, 14, 18, 32), 280);
   }
 
   let x = -80;
   let t = 0;
-  let tapElapsed = 0;
-  let nextTapAt = 2000 + Math.random()*2500;
+  let waveElapsed = 0;
+  let nextWaveAt = 3000 + Math.random()*3000;
+  let speedMul = 1; // eases toward 1 while running right, toward WAVE_SLOW while waving
   let last = performance.now();
+  const WAVE_SLOW = 0.35;
 
   function frame(now){
     const dt = Math.min(now - last, 100);
     last = now;
     t += dt;
 
-    const speed = 70 + 30*Math.sin(t/1500) + 15*Math.sin(t/420); // px/s, always > 0
+    const isWaving = runner.classList.contains('waving');
+    const targetMul = isWaving ? WAVE_SLOW : 1;
+    speedMul += (targetMul - speedMul) * Math.min(dt/220, 1); // smooth slow-down/speed-up
+
+    const baseSpeed = 90 + 35*Math.sin(t/1500) + 15*Math.sin(t/420); // px/s, always > 0
+    const speed = baseSpeed * speedMul;
     const prevX = x;
     x += (speed*dt)/1000;
 
@@ -556,12 +607,12 @@ renderAll();
     if(x > width + 40) x = -40;
     runner.style.left = x + 'px';
 
-    tapElapsed += dt;
-    if(!runner.classList.contains('tapping') && tapElapsed > nextTapAt){
-      runner.classList.add('tapping');
-      tapElapsed = 0;
-      nextTapAt = 3500 + Math.random()*3500;
-      setTimeout(()=>runner.classList.remove('tapping'), 640);
+    waveElapsed += dt;
+    if(!runner.classList.contains('waving') && waveElapsed > nextWaveAt){
+      runner.classList.add('waving');
+      waveElapsed = 0;
+      nextWaveAt = 5000 + Math.random()*4000;
+      setTimeout(()=>runner.classList.remove('waving'), 1300);
     }
 
     track.style.top = navEl.getBoundingClientRect().bottom + 'px';
