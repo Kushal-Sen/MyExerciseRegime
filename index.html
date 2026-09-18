@@ -4,17 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kushal's Training Split</title>
-<meta name="description" content="A rotating strength training split — deadlift, push, pull and squat days with exercise cues, a weekly progress tracker, and calendar logging, all in one page.">
+<meta name="description" content="A rotating strength training split — deadlift, push, pull and squat days with exercise cues and calendar logging, all in one page.">
 <meta name="theme-color" content="#101314">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%8F%8B</text></svg>">
 
 <meta property="og:type" content="website">
 <meta property="og:title" content="Kushal's Training Split">
-<meta property="og:description" content="A rotating strength training split — deadlift, push, pull and squat days with exercise cues, a weekly progress tracker, and calendar logging, all in one page.">
+<meta property="og:description" content="A rotating strength training split — deadlift, push, pull and squat days with exercise cues and calendar logging, all in one page.">
 
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Kushal's Training Split">
-<meta name="twitter:description" content="A rotating strength training split — deadlift, push, pull and squat days with exercise cues, a weekly progress tracker, and calendar logging, all in one page.">
+<meta name="twitter:description" content="A rotating strength training split — deadlift, push, pull and squat days with exercise cues and calendar logging, all in one page.">
 <style>
   :root{
     --bg:#101314; --panel:#181c1e; --panel-2:#1f2426; --line:#2a3033;
@@ -90,12 +90,6 @@
   .done-bar p{color:var(--ink-dim);font-size:12px;margin:0 0 10px;}
   .done-btn{width:100%;padding:14px;border-radius:11px;border:none;font-weight:800;font-size:15px;cursor:pointer;background:var(--accent);color:#12160e;}
   .done-btn.completed{background:var(--panel-2);color:var(--accent);border:1px solid var(--accent-dim);}
-
-  .tracker-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px;}
-  .tracker-table th{background:var(--panel-2);color:var(--ink-dim);font-weight:700;padding:8px 6px;border:1px solid var(--line);text-align:left;font-size:11px;}
-  .tracker-table td{border:1px solid var(--line);padding:10px 6px;height:14px;}
-  .tracker-note{color:var(--ink-dim);font-size:13px;line-height:1.6;margin-top:16px;}
-  .tracker-note b{color:var(--ink);}
 
   .rest-panel{text-align:center;padding:40px 20px 10px;color:var(--ink-dim);}
   .rest-panel .big{font-size:44px;margin-bottom:10px;}
@@ -321,8 +315,7 @@ function renderTabs(){
   const tabList = [
     ...PLAN.days.map(d=>({id:d.id,num:d.num,label:d.label})),
     {id:'rest',num:'7',label:'Rest',rest:true},
-    {id:'calendar',num:'\u{1F4C5}',label:'Calendar'},
-    {id:'tracker',num:'',label:'Tracker'}
+    {id:'calendar',num:'\u{1F4C5}',label:'Calendar'}
   ];
   tabList.forEach((t,i)=>{
     const btn = document.createElement('div');
@@ -412,26 +405,6 @@ function restView(){
   return `<div class="rest-panel"><div class="big">&#9829;</div><h2>Rest Day</h2><p>Recovery is part of the program. Deadlift day comes right after this, arrive fresh.</p></div>` + doneBar('rest');
 }
 
-function trackerView(){
-  let rows = '';
-  for(let i=0;i<8;i++){
-    rows += `<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`;
-  }
-  return `
-  <div class="block-label">Weekly Progress Tracker</div>
-  <div style="overflow-x:auto;">
-  <table class="tracker-table">
-    <thead><tr>
-      <th>Week of</th><th>Bodyweight</th><th>BP</th><th>Deadlift</th><th>Squat</th><th>Bench</th><th>Lat Pulldown</th><th>Notes</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  </div>
-  <div class="tracker-note">
-    Fill this in once a week, same day, same time, ideally morning, before eating. <b>Log bodyweight and BP</b> every week without fail. For the 4 key lifts, note the heaviest clean working set. Use <b>Notes</b> for anything relevant: poor sleep, high stress, missed sessions, so patterns are easier to spot later. <b>Every 5-6 weeks, take a deload</b>: same days and exercises, but cut weight by about 40% to let your joints and nervous system recover.
-  </div>`;
-}
-
 function calendarView(){
   const year = calMonth.getFullYear(), month = calMonth.getMonth();
   const monthLabel = calMonth.toLocaleString('default', {month:'long', year:'numeric'});
@@ -496,10 +469,6 @@ function renderAll(){
   const calV = document.createElement('div');
   calV.className = 'view' + (currentTab==='calendar'?' active':''); calV.id = 'calendar'; calV.innerHTML = calendarView();
   viewsEl.appendChild(calV);
-
-  const trackV = document.createElement('div');
-  trackV.className = 'view' + (currentTab==='tracker'?' active':''); trackV.id = 'tracker'; trackV.innerHTML = trackerView();
-  viewsEl.appendChild(trackV);
 }
 
 let currentTab = scheduledDayFor(new Date());
