@@ -552,7 +552,8 @@ renderAll();
   const track = document.getElementById('runner-track');
   const runner = document.getElementById('runner');
   const navEl = document.getElementById('tabs');
-  if(!track || !runner || !navEl) return;
+  const finishEl = document.getElementById('finish-line');
+  if(!track || !runner || !navEl || !finishEl) return;
 
   runner.addEventListener('mouseenter', () => {
     if(runner.classList.contains('jumping')) return;
@@ -645,7 +646,22 @@ renderAll();
 
     const width = track.getBoundingClientRect().width || window.innerWidth;
     const finishX = width * FINISH_PCT;
-    if(prevX < finishX && x >= finishX){
+
+    // Hide the finish line whenever it would actually overlap the tabs —
+    // e.g. on narrow screens where the tab row fills the width — rather
+    // than hiding it at a fixed breakpoint regardless of how much room
+    // there really is.
+    const tabs = navEl.querySelectorAll('.tab');
+    let overlapsTabs = false;
+    if(tabs.length){
+      const navRect = navEl.getBoundingClientRect();
+      const lastTabRight = tabs[tabs.length-1].getBoundingClientRect().right - navRect.left;
+      const finishLeftEdge = finishX - (finishEl.offsetWidth/2);
+      overlapsTabs = finishLeftEdge < lastTabRight + 14;
+    }
+    finishEl.style.display = overlapsTabs ? 'none' : '';
+
+    if(!overlapsTabs && prevX < finishX && x >= finishX){
       fireworks(finishX, 22);
     }
     if(x > width + 40) x = -40;
