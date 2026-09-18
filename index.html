@@ -171,8 +171,10 @@
   .finish-checker{position:absolute;bottom:-4px;left:-2px;width:70px;height:8px;border-radius:2px;background:repeating-linear-gradient(90deg,#111 0 8px,#eee 8px 16px);}
   .spark{position:absolute;bottom:0;left:0;width:6px;height:6px;border-radius:50%;pointer-events:none;animation:sparkPop 0.85s ease-out forwards;}
   @keyframes sparkPop{0%{transform:translate(0,0) scale(1);opacity:1;}100%{transform:translate(var(--dx),var(--dy)) scale(0.3);opacity:0;}}
-  .burst-ring{position:absolute;width:14px;height:14px;border-radius:50%;border:3px solid;pointer-events:none;animation:ringPop 0.55s ease-out forwards;}
-  @keyframes ringPop{0%{transform:scale(0.3);opacity:0.9;}100%{transform:scale(3.4);opacity:0;}}
+  .burst-ring{position:absolute;border-radius:50%;border:3px solid;pointer-events:none;animation:ringPop 0.6s ease-out forwards;}
+  @keyframes ringPop{0%{transform:scale(0.3);opacity:0.9;}100%{transform:scale(3.6);opacity:0;}}
+  .fw-glow{position:fixed;top:0;right:0;bottom:0;width:58%;pointer-events:none;z-index:40;mix-blend-mode:screen;background:radial-gradient(circle at 78% 42%, rgba(255,244,214,0.55), rgba(255,180,84,0.18) 45%, transparent 70%);animation:glowPulse 1.7s ease-out forwards;}
+  @keyframes glowPulse{0%{opacity:0;}12%{opacity:1;}100%{opacity:0;}}
 </style>
 </head>
 <body>
@@ -560,21 +562,44 @@ renderAll();
       track.appendChild(s);
       setTimeout(()=>s.remove(), 950);
     }
+    const ringSize = Math.max(16, spreadMax*0.55);
     const ring = document.createElement('div');
     ring.className = 'burst-ring';
-    ring.style.left = (atX-7) + 'px';
-    ring.style.bottom = (atY-7) + 'px';
+    ring.style.width = ringSize + 'px';
+    ring.style.height = ringSize + 'px';
+    ring.style.left = (atX - ringSize/2) + 'px';
+    ring.style.bottom = (atY - ringSize/2) + 'px';
     ring.style.borderColor = FIREWORK_COLORS[Math.floor(Math.random()*FIREWORK_COLORS.length)];
     track.appendChild(ring);
-    setTimeout(()=>ring.remove(), 600);
+    setTimeout(()=>ring.remove(), 650);
   }
 
-  // A grander celebration: three staggered pops radiating from the finish
-  // banner instead of one, so it reads as a small fireworks show, not a blip.
+  function showGlow(){
+    const glow = document.createElement('div');
+    glow.className = 'fw-glow';
+    document.body.appendChild(glow);
+    setTimeout(()=>glow.remove(), 1700);
+  }
+
+  // A grander celebration: a burst right at the finish banner, then several
+  // more "rockets" popping at scattered heights across the right side of the
+  // screen, plus a brief warm glow washing over that side of the page — a
+  // small fireworks show, not a single flat pop.
   function fireworks(atX, atY){
-    burst(atX, atY, 22, 26, 48);
-    setTimeout(()=>burst(atX + (Math.random()*16-8), atY + 16 + Math.random()*10, 16, 20, 38), 140);
-    setTimeout(()=>burst(atX + (Math.random()*16-8), atY + 6, 14, 18, 32), 280);
+    showGlow();
+    burst(atX, atY, 30, 30, 60);
+
+    const width = track.getBoundingClientRect().width || window.innerWidth;
+    const zoneStart = width*0.6, zoneEnd = width*0.97;
+    const rockets = 5;
+    for(let i=0;i<rockets;i++){
+      setTimeout(()=>{
+        const bx = zoneStart + Math.random()*(zoneEnd-zoneStart);
+        const by = 45 + Math.random()*190;
+        const count = 18 + Math.floor(Math.random()*14);
+        burst(bx, by, count, 22, 46);
+      }, 160 + i*230 + Math.random()*120);
+    }
   }
 
   let x = -80;
