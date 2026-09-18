@@ -164,6 +164,32 @@
     100%{transform:rotate(18deg);}
   }
 
+  /* Erase-mode: he stops running, stands still, and wipes a chalkboard with
+     a duster pulled from his front hand — played when "Clear data" is
+     confirmed, before the data actually clears. */
+  .runner .duster{fill:#8a6a4a;opacity:0;}
+  .runner.erasing .duster{opacity:1;}
+  .runner.erasing .hand-front{opacity:0;}
+  .runner.erasing .leg-back,.runner.erasing .leg-front{animation:none;transform:rotate(4deg);}
+  .runner.erasing .arm-back{animation:none;transform:rotate(-8deg);}
+  .runner.erasing.wiping .arm-front{animation:armWipe 1.4s ease-in-out;}
+  @keyframes armWipe{
+    0%{transform:rotate(18deg);}
+    12%{transform:rotate(-45deg);}
+    30%{transform:rotate(15deg);}
+    45%{transform:rotate(-45deg);}
+    60%{transform:rotate(15deg);}
+    75%{transform:rotate(-45deg);}
+    90%{transform:rotate(15deg);}
+    100%{transform:rotate(18deg);}
+  }
+
+  #erase-board{position:absolute;bottom:6px;left:-200px;width:90px;height:63px;opacity:0;transform:translate(-50%,0) scale(0.85);transition:opacity 0.25s ease,transform 0.25s ease;pointer-events:none;}
+  #erase-board.show{opacity:1;transform:translate(-50%,0) scale(1);}
+  .board-frame{fill:#2e2a24;stroke:var(--muted);stroke-width:2;}
+  .scribble{stroke:#cfd8d6;stroke-width:3;stroke-linecap:round;fill:none;opacity:0.85;transition:opacity 1.1s ease;}
+  .runner.erasing.wiping ~ #erase-board .scribble{opacity:0;}
+
   #finish-line{position:absolute;left:82%;bottom:0;transform:translateX(-50%);width:66px;height:0;pointer-events:none;}
   .finish-pole{position:absolute;bottom:0;width:3px;height:34px;background:var(--ink-dim);border-radius:2px;}
   .finish-pole-l{left:0;}
@@ -238,10 +264,21 @@
     </g>
     <g class="arm-front">
       <line x1="39" y1="28" x2="49" y2="17"/>
-      <circle class="hand" cx="50" cy="16" r="4"/>
+      <circle class="hand hand-front" cx="50" cy="16" r="4"/>
+      <rect class="duster" x="46" y="9" width="11" height="7" rx="1.5"/>
     </g>
   </svg>
-</div></div>
+  </div>
+  <div id="erase-board">
+    <svg viewBox="0 0 100 70">
+      <rect class="board-frame" x="2" y="2" width="96" height="66" rx="6"/>
+      <path class="scribble" d="M14,18 h30"/>
+      <path class="scribble" d="M14,30 h50"/>
+      <path class="scribble" d="M14,42 h40"/>
+      <path class="scribble" d="M14,54 h60"/>
+    </svg>
+  </div>
+</div>
 <main id="views"></main>
 
 <div class="storage-note">Progress is saved in this browser on this device. Reopening the same file here will remember it; a different device or browser starts fresh. Drag the mascot backward to clear it.</div>
@@ -536,11 +573,15 @@ function toggleDone(dayId){
 function showResetDialog(){ document.getElementById('reset-dialog').hidden = false; }
 function hideResetDialog(){ document.getElementById('reset-dialog').hidden = true; }
 function confirmResetProgress(){
-  STATE = {history:{}, restDay:{}};
-  saveState(STATE);
-  renderAll();
-  selectTab('w'+new Date().getDay());
   hideResetDialog();
+  const clear = () => {
+    STATE = {history:{}, restDay:{}};
+    saveState(STATE);
+    renderAll();
+    selectTab('w'+new Date().getDay());
+  };
+  if(window.mascotPlayErase) window.mascotPlayErase(clear);
+  else clear();
 }
 document.addEventListener('keydown', (e) => {
   if(e.key === 'Escape') hideResetDialog();
@@ -561,7 +602,8 @@ renderAll();
   const runner = document.getElementById('runner');
   const navEl = document.getElementById('tabs');
   const finishEl = document.getElementById('finish-line');
-  if(!track || !runner || !navEl || !finishEl) return;
+  const boardEl = document.getElementById('erase-board');
+  if(!track || !runner || !navEl || !finishEl || !boardEl) return;
 
   runner.addEventListener('mouseenter', () => {
     if(runner.classList.contains('jumping')) return;
@@ -716,6 +758,42 @@ renderAll();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  // Plays the "erase the board" sequence when the reset dialog is
+  // confirmed: walk to a stage spot, board fades in, he wipes it with a
+  // duster (CSS drives both the arm swing and the board's scribbles
+  // fading via a sibling selector), board fades out, then onDone() runs
+  // (the actual data clear) and normal running resumes.
+  function playEraseAnimation(onDone){
+    dragging = true; // reuse the pause mechanism that freezes autonomous movement
+    runner.classList.remove('waving');
+    runner.classList.add('erasing');
+
+    const width = track.getBoundingClientRect().width || window.innerWidth;
+    const stageX = width * 0.45;
+    boardEl.style.left = (stageX + 70) + 'px';
+
+    runner.style.transition = 'left 0.5s ease';
+    x = stageX;
+    runner.style.left = x + 'px';
+
+    setTimeout(() => {
+      runner.style.transition = '';
+      boardEl.classList.add('show');
+
+      setTimeout(() => {
+        runner.classList.add('wiping');
+
+        setTimeout(() => {
+          boardEl.classList.remove('show');
+          runner.classList.remove('erasing','wiping');
+          dragging = false;
+          onDone();
+        }, 1500);
+      }, 300);
+    }, 520);
+  }
+  window.mascotPlayErase = playEraseAnimation;
 })();
 </script>
 </body>
