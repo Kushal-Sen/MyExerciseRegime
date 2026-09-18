@@ -8,6 +8,13 @@
 <meta name="theme-color" content="#101314">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>%F0%9F%8F%8B</text></svg>">
 
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Training Split">
+<meta name="mobile-web-app-capable" content="yes">
+
 <meta property="og:type" content="website">
 <meta property="og:title" content="Kushal's Training Split">
 <meta property="og:description" content="A rotating strength training split — deadlift, push, pull and squat days with exercise cues, laid out Sunday through Saturday in one page.">
@@ -588,6 +595,15 @@ document.addEventListener('keydown', (e) => {
 });
 
 renderAll();
+
+// Lets the page install as a home-screen app and work offline. Registration
+// only succeeds when served over http(s) (GitHub Pages) — silently no-ops
+// under file:// or if the browser lacks support.
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 
 // 10K-steps mascot: a jogger running along the sticky nav's bottom border,
 // facing right by default (single-eye/nose profile face), pace wobbling via
