@@ -43,6 +43,7 @@
   .banner .bl{font-size:11px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;}
   .banner .bt{font-size:16px;font-weight:800;margin-top:2px;}
   .banner button{background:var(--accent);color:#12160e;border:none;padding:9px 14px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .streak-chip{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-size:12px;font-weight:700;padding:6px 10px;border-radius:999px;white-space:nowrap;}
 
   nav{position:sticky;top:0;z-index:10;background:var(--bg);padding:14px 16px 10px;display:flex;gap:8px;overflow-x:auto;border-bottom:1px solid var(--line);}
   nav::-webkit-scrollbar{display:none;}
@@ -144,6 +145,18 @@
   .runner .nose{fill:#e2b98d;}
   .runner .shoe{fill:#20242a;}
   .runner .hand{fill:#f2cda3;}
+
+  /* Streak milestones: tier1 (3+ days) shades, tier2 (7+ days) adds a
+     flame trail while running, tier3 (30+ days) adds a gold medal + band.
+     Classes are cumulative — reaching tier3 keeps tier1/tier2 too. */
+  .runner .sunglasses{opacity:0;fill:#141414;stroke:var(--accent);stroke-width:0.8;transition:opacity 0.3s ease;}
+  .runner.tier1 .sunglasses{opacity:1;}
+  .runner .medal-ribbon{fill:none;stroke:#3a6fd1;stroke-width:2.4;opacity:0;transition:opacity 0.3s ease;}
+  .runner .medal-disc{fill:#ffd54a;stroke:#caa63a;stroke-width:1;opacity:0;transition:opacity 0.3s ease;}
+  .runner.tier3 .medal-ribbon,.runner.tier3 .medal-disc{opacity:1;}
+  .runner.tier3 .band{fill:#ffd54a;filter:drop-shadow(0 0 2px rgba(255,213,74,0.8));}
+  .flame-particle{position:absolute;bottom:2px;left:0;width:7px;height:9px;border-radius:50% 50% 50% 0;pointer-events:none;animation:flameFade 0.55s ease-out forwards;}
+  @keyframes flameFade{0%{transform:translate(-50%,0) scale(1) rotate(20deg);opacity:0.9;}100%{transform:translate(-50%,-20px) scale(0.3) rotate(20deg);opacity:0;}}
 
   .runner .face-side{opacity:1;transition:opacity 0.25s ease;}
   .runner .face-front{opacity:0;transition:opacity 0.25s ease;}
@@ -253,6 +266,10 @@
     </g>
     <ellipse class="body" cx="30" cy="37" rx="16" ry="15"/>
     <path class="stripe" d="M22,25 Q30,50 38,25"/>
+    <g class="medal">
+      <path class="medal-ribbon" d="M25,26 L30,38 L35,26"/>
+      <circle class="medal-disc" cx="30" cy="40" r="5.5"/>
+    </g>
     <circle class="head" cx="30" cy="15" r="11"/>
     <path class="hair" d="M18,11 Q19,-3 30,1 Q41,-3 42,11 Q36,4 30,6 Q24,4 18,11 Z"/>
     <rect class="band" x="18.5" y="8.5" width="23" height="3" rx="1.5"/>
@@ -268,6 +285,11 @@
       <circle class="blush" cx="22.5" cy="19.5" r="2"/>
       <circle class="blush" cx="37.5" cy="19.5" r="2"/>
       <path class="mouth" d="M27,20.5 Q30,22.5 33,20.5"/>
+    </g>
+    <g class="sunglasses">
+      <circle cx="27" cy="16" r="3.4"/>
+      <circle cx="35" cy="16" r="3.4"/>
+      <line x1="30.4" y1="16" x2="31.6" y2="16"/>
     </g>
     <g class="arm-front">
       <line x1="39" y1="28" x2="49" y2="17"/>
@@ -321,16 +343,44 @@ function fmtDate(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 
+// Consecutive logged days counting back from today. If today isn't logged
+// yet, the streak isn't broken until the whole day passes with nothing
+// logged — so it keeps showing yesterday's count rather than dropping to
+// zero the moment you open the app in the morning.
+// A day keeps the streak alive if it was logged, OR it was a scheduled
+// rest day (rest doesn't need a tap to "complete" — only a missed
+// training day should break the streak). The rest-day pass only applies
+// from startDate onward, so a fresh install can't inherit a streak from
+// rest days that happened before you ever used the app.
+function dayKeepsStreak(date){
+  const ds = fmtDate(date);
+  if(STATE.history[ds]) return true;
+  if(ds < STATE.startDate) return false;
+  return scheduledDayFor(date) === 'rest';
+}
+
+function getStreak(){
+  let streak = 0;
+  const d = new Date();
+  if(!dayKeepsStreak(d)) d.setDate(d.getDate()-1);
+  while(dayKeepsStreak(d)){
+    streak++;
+    d.setDate(d.getDate()-1);
+  }
+  return streak;
+}
+
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const s = JSON.parse(raw);
       s.restDay = s.restDay || {}; // older saved states predate per-week rest overrides
+      s.startDate = s.startDate || todayStr(); // older saved states predate this too
       return s;
     }
   }catch(e){}
-  const fresh = {history:{}, restDay:{}};
+  const fresh = {history:{}, restDay:{}, startDate: todayStr()};
   saveState(fresh);
   return fresh;
 }
@@ -391,11 +441,14 @@ function renderBanner(){
   const upNext = scheduledDayFor(today);
   const done = STATE.history[todayStr()];
   const label = id => id==='rest' ? 'Rest Day' : (dayById(id)||{}).label || '';
+  const streak = getStreak();
+  const streakChip = streak>0 ? `<div class="streak-chip">\u{1F525} ${streak} day${streak===1?'':'s'}</div>` : '';
   if(done){
-    bannerEl.innerHTML = `<div><div class="bl">Today, logged</div><div class="bt">${WEEKDAY_SHORT[today.getDay()]} — ${label(done.dayId)}</div></div><button onclick="selectTab('${todayTabId}')">View</button>`;
+    bannerEl.innerHTML = `<div><div class="bl">Today, logged</div><div class="bt">${WEEKDAY_SHORT[today.getDay()]} — ${label(done.dayId)}</div></div>${streakChip}<button onclick="selectTab('${todayTabId}')">View</button>`;
   } else {
-    bannerEl.innerHTML = `<div><div class="bl">Up next</div><div class="bt">${WEEKDAY_SHORT[today.getDay()]} — ${label(upNext)}</div></div><button onclick="selectTab('${todayTabId}')">Go</button>`;
+    bannerEl.innerHTML = `<div><div class="bl">Up next</div><div class="bt">${WEEKDAY_SHORT[today.getDay()]} — ${label(upNext)}</div></div>${streakChip}<button onclick="selectTab('${todayTabId}')">Go</button>`;
   }
+  if(window.mascotUpdateTier) window.mascotUpdateTier(streak);
 }
 
 function renderTabs(){
@@ -582,7 +635,7 @@ function hideResetDialog(){ document.getElementById('reset-dialog').hidden = tru
 function confirmResetProgress(){
   hideResetDialog();
   const clear = () => {
-    STATE = {history:{}, restDay:{}};
+    STATE = {history:{}, restDay:{}, startDate: todayStr()};
     saveState(STATE);
     renderAll();
     selectTab('w'+new Date().getDay());
@@ -719,6 +772,7 @@ if('serviceWorker' in navigator){
   let t = 0;
   let waveElapsed = 0;
   let nextWaveAt = 3000 + Math.random()*3000;
+  let flameElapsed = 0;
   let speedMul = 1; // eases toward 1 while running right, toward WAVE_SLOW while waving
   let last = performance.now();
   const WAVE_SLOW = 0.35;
@@ -733,7 +787,12 @@ if('serviceWorker' in navigator){
       const targetMul = isWaving ? WAVE_SLOW : 1;
       speedMul += (targetMul - speedMul) * Math.min(dt/220, 1); // smooth slow-down/speed-up
 
-      const baseSpeed = 90 + 35*Math.sin(t/1500) + 15*Math.sin(t/420); // px/s, always > 0
+      // A streak of logged days gives him real momentum, not just cosmetics.
+      const momentum = runner.classList.contains('tier3') ? 1.2
+        : runner.classList.contains('tier2') ? 1.1
+        : runner.classList.contains('tier1') ? 1.05
+        : 1;
+      const baseSpeed = (90 + 35*Math.sin(t/1500) + 15*Math.sin(t/420)) * momentum; // px/s, always > 0
       const speed = baseSpeed * speedMul;
       const prevX = x;
       x += (speed*dt)/1000;
@@ -766,6 +825,14 @@ if('serviceWorker' in navigator){
         waveElapsed = 0;
         nextWaveAt = 5000 + Math.random()*4000;
         setTimeout(()=>runner.classList.remove('waving'), 1300);
+      }
+
+      if(runner.classList.contains('tier2')){
+        flameElapsed += dt;
+        if(flameElapsed > 90){
+          flameElapsed = 0;
+          spawnFlame(x, 4);
+        }
       }
     }
     runner.style.left = x + 'px';
@@ -810,6 +877,24 @@ if('serviceWorker' in navigator){
     }, 520);
   }
   window.mascotPlayErase = playEraseAnimation;
+
+  function spawnFlame(atX, atY){
+    const colors = ['#ff8a3d','#ff6b3d','#ffb454','#ff4d4d'];
+    const f = document.createElement('div');
+    f.className = 'flame-particle';
+    f.style.left = atX + 'px';
+    f.style.bottom = atY + 'px';
+    f.style.background = colors[Math.floor(Math.random()*colors.length)];
+    track.appendChild(f);
+    setTimeout(()=>f.remove(), 600);
+  }
+
+  window.mascotUpdateTier = function(streak){
+    runner.classList.toggle('tier1', streak >= 3);
+    runner.classList.toggle('tier2', streak >= 7);
+    runner.classList.toggle('tier3', streak >= 30);
+  };
+  window.mascotUpdateTier(typeof getStreak === 'function' ? getStreak() : 0);
 })();
 </script>
 </body>
