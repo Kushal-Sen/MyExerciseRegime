@@ -42,7 +42,7 @@
   .banner{margin:14px 16px 0;background:linear-gradient(135deg, rgba(198,255,94,0.12), rgba(198,255,94,0.03));border:1px solid var(--accent-dim);border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;max-width:608px;margin-left:auto;margin-right:auto;}
   .banner .bl{font-size:11px;color:var(--accent);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;}
   .banner .bt{font-size:16px;font-weight:800;margin-top:2px;}
-  .banner button{background:var(--accent);color:#12160e;border:none;padding:9px 14px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .banner button{background:var(--accent);color:#12160e;border:none;padding:12px 16px;border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;}
   .streak-chip{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);font-size:12px;font-weight:700;padding:6px 10px;border-radius:999px;white-space:nowrap;}
 
   nav{position:sticky;top:0;z-index:10;background:var(--bg);padding:14px 16px 10px;display:flex;gap:8px;overflow-x:auto;border-bottom:1px solid var(--line);}
@@ -91,14 +91,14 @@
   .detail-text .lbl:first-child{margin-top:0;}
   .detail-text .val{color:var(--ink);}
   .cue{color:var(--accent);}
-  .video-btn{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:7px 12px;border-radius:8px;border:1px solid var(--accent-dim);color:var(--accent);background:transparent;font-size:12px;font-weight:700;text-decoration:none;}
+  .video-btn{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:10px 14px;border-radius:8px;border:1px solid var(--accent-dim);color:var(--accent);background:transparent;font-size:12px;font-weight:700;text-decoration:none;}
   .video-btn:hover{background:rgba(198,255,94,0.08);}
 
   .last-time{color:var(--ink);}
   .ex-right{text-align:right;}
   .ex-logged{color:var(--accent);font-size:11px;font-weight:700;white-space:nowrap;}
   .log-panel{padding:0 14px 14px;}
-  .log-toggle{width:100%;padding:9px;background:transparent;border:1px dashed var(--line);color:var(--ink-dim);border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;}
+  .log-toggle{width:100%;padding:12px;background:transparent;border:1px dashed var(--line);color:var(--ink-dim);border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;}
   .log-body{display:none;}
   .ex-card.logging .log-toggle{display:none;}
   .ex-card.logging .log-body{display:block;}
@@ -106,7 +106,7 @@
   .set-row{display:grid;grid-template-columns:52px 1fr 1fr;gap:8px;align-items:center;margin-bottom:6px;}
   .set-row .sn{color:var(--ink-dim);font-size:12px;font-weight:700;}
   .set-row label{display:flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:0 10px;}
-  .set-row input{width:100%;min-width:0;background:transparent;border:none;color:var(--ink);font-size:15px;padding:9px 0;outline:none;}
+  .set-row input{width:100%;min-width:0;background:transparent;border:none;color:var(--ink);font-size:16px;padding:9px 0;outline:none;}
   .set-row label:focus-within{border-color:var(--accent-dim);}
   .set-row .u{color:var(--ink-dim);font-size:11px;}
   .log-note{color:var(--muted);font-size:11px;margin-top:4px;}
@@ -142,7 +142,8 @@
   .f2f-label span{display:inline-block;font-size:9px;font-weight:800;letter-spacing:0.03em;color:var(--ink-dim);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:2px 7px;transform:rotate(-2deg);white-space:nowrap;}
   .f2f-label b{color:var(--accent);}
   .f2f-label em{font-style:normal;color:var(--amber);}
-  @media (max-width:480px){ .f2f-sticker{transform:scale(0.82);transform-origin:top right;} }
+  /* On phones the sticker scrolls away with the header instead of covering the sticky day tabs. */
+  @media (max-width:480px){ .f2f-sticker{position:absolute;transform:scale(0.82);transform-origin:top right;} }
   @media (max-width:380px){ .f2f-sticker{transform:scale(0.68);transform-origin:top right;} }
 
   #runner-track{position:fixed;left:0;top:0;width:100%;height:0;z-index:11;pointer-events:none;}
@@ -574,7 +575,7 @@ function logPanel(ex){
     <div class="log-body">
       ${hint ? `<div class="log-hint">${hint}</div>` : ''}
       ${rows}
-      <div class="log-note">Grey numbers are last time's. Leave kg empty for bodyweight.</div>
+      <div class="log-note">${last ? "Grey numbers are last time's. " : ''}Leave kg empty for bodyweight.</div>
     </div>
   </div>`;
 }
