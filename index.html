@@ -134,6 +134,14 @@
   .modal-btn.danger{background:#ff6b6b;color:#2a0e0e;border-color:#ff6b6b;}
 
   footer{max-width:640px;margin:30px auto 0;padding:16px;color:var(--ink-dim);font-size:12px;line-height:1.6;border-top:1px solid var(--line);}
+  .backup-box{max-width:608px;margin:26px auto 12px;padding:14px 16px;background:var(--panel);border:1px solid var(--line);border-radius:14px;}
+  @media (max-width:640px){ .backup-box{margin:26px 16px 12px;} }
+  .backup-title{font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-dim);}
+  .backup-status{margin:4px 0 12px;font-size:13px;color:var(--ink);}
+  .backup-status.stale{color:var(--amber);}
+  .backup-actions{display:flex;gap:10px;}
+  .backup-btn{flex:1;padding:12px 10px;border-radius:10px;border:1px solid var(--accent-dim);background:transparent;color:var(--accent);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}
+  .modal-btn.primary{background:var(--accent);color:#12160e;border-color:var(--accent);}
   .storage-note{max-width:640px;margin:0 auto;padding:0 16px;color:var(--muted);font-size:11px;}
 
   .f2f-sticker{position:fixed;top:8px;right:4px;z-index:50;width:186px;}
@@ -368,11 +376,31 @@
 </div>
 <main id="views"></main>
 
-<div class="storage-note">Progress is saved in this browser on this device. Reopening the same file here will remember it; a different device or browser starts fresh. Drag the mascot backward to clear it.</div>
+<section class="backup-box">
+  <div class="backup-title">Backup</div>
+  <p id="backup-status" class="backup-status"></p>
+  <div class="backup-actions">
+    <button class="backup-btn" onclick="saveBackup()">&#8595; Save backup</button>
+    <button class="backup-btn" onclick="document.getElementById('restore-file').click()">&#8593; Restore backup</button>
+  </div>
+  <input type="file" id="restore-file" accept="application/json,.json" hidden onchange="restoreFromFile(this)">
+</section>
+<div class="storage-note">Progress is saved in this browser on this device. On your phone, Save backup opens the share sheet, so you can pick Save to Drive, Files, or send it to yourself. Restore picks a backup file from Drive or the phone. Drag the mascot backward to clear everything.</div>
 
 <footer>
   Pictograms are simplified references for matching a name to a movement, not a form tutorial. Exhale on exertion, never hold your breath through a heavy rep.
 </footer>
+
+<div id="restore-dialog" class="modal-overlay" hidden onclick="if(event.target===this) hideRestoreDialog()">
+  <div class="modal-card">
+    <h3>Restore this backup?</h3>
+    <p id="restore-summary"></p>
+    <div class="modal-actions">
+      <button class="modal-btn cancel" onclick="hideRestoreDialog()">Cancel</button>
+      <button class="modal-btn primary" onclick="confirmRestore()">Restore</button>
+    </div>
+  </div>
+</div>
 
 <div id="reset-dialog" class="modal-overlay" hidden onclick="if(event.target===this) hideResetDialog()">
   <div class="modal-card">
@@ -797,8 +825,120 @@ function undoRestOverride(){
   selectTab('w'+new Date().getDay());
 }
 
+// ---- Backup / restore ------------------------------------------------------
+// The whole STATE goes into one JSON file. On phones it's handed to the
+// share sheet (Save to Drive, Files, WhatsApp, email...); elsewhere, or if
+// sharing isn't available, it downloads. Restore reads a file back in —
+// the phone's picker can open it straight from Drive.
+const BACKUP_APP = 'kushal-training-split';
+
+function daysSince(ds){
+  if(!ds) return null;
+  const [y,m,d] = ds.split('-').map(Number);
+  const then = new Date(y, m-1, d), now = new Date(todayStr().replace(/-/g,'/'));
+  return Math.round((now - then) / 86400000);
+}
+
+function renderBackupStatus(){
+  const el = document.getElementById('backup-status');
+  if(!el) return;
+  const logged = Object.keys(STATE.history).length;
+  const ago = daysSince(STATE.lastBackup);
+  let msg, stale = false;
+  if(ago === null){
+    msg = logged ? `No backup yet \u2014 ${logged} logged day${logged===1?'':'s'} only live on this device.` : 'No backup yet.';
+    stale = logged > 0;
+  } else {
+    msg = `Last backup: ${ago===0 ? 'today' : ago===1 ? 'yesterday' : ago+' days ago'}.`;
+    stale = ago >= 7;
+    if(stale) msg += ' Worth saving a fresh one.';
+  }
+  el.textContent = msg;
+  el.classList.toggle('stale', stale);
+}
+
+function downloadFile(file){
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url; a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function saveBackup(){
+  const payload = {app: BACKUP_APP, version: 1, exportedAt: new Date().toISOString(), state: STATE};
+  const name = `training-backup-${todayStr()}.json`;
+  const file = new File([JSON.stringify(payload, null, 2)], name, {type: 'application/json'});
+  const markSaved = () => {
+    STATE.lastBackup = todayStr();
+    saveState(STATE);
+    renderBackupStatus();
+    showToast('\u2705 Backup saved<small>' + name + '</small>');
+  };
+  const isPhone = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+  if(isPhone && navigator.canShare && navigator.canShare({files: [file]})){
+    try{
+      await navigator.share({files: [file], title: 'Training backup'});
+      markSaved();
+      return;
+    }catch(e){
+      if(e && e.name === 'AbortError') return; // closed the share sheet
+    }
+  }
+  downloadFile(file);
+  markSaved();
+}
+
+let pendingRestore = null;
+function restoreFromFile(input){
+  const file = input.files && input.files[0];
+  input.value = ''; // let the same file be picked again later
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      const st = data && data.app === BACKUP_APP ? data.state : null;
+      if(!st || typeof st.history !== 'object') throw new Error('bad file');
+      pendingRestore = st;
+      const days = Object.keys(st.history).length;
+      const sessions = Object.keys(st.sets || {}).length;
+      const when = data.exportedAt ? new Date(data.exportedAt).toLocaleDateString() : 'an unknown date';
+      document.getElementById('restore-summary').textContent =
+        `Backup from ${when}: ${days} logged day${days===1?'':'s'}` +
+        (sessions ? ` and weights from ${sessions} session${sessions===1?'':'s'}` : '') +
+        '. This replaces the progress currently on this device.';
+      document.getElementById('restore-dialog').hidden = false;
+    }catch(e){
+      showToast('\u26A0\uFE0F That file isn\u2019t a training backup<small>Pick a training-backup-\u2026.json file</small>');
+    }
+  };
+  reader.readAsText(file);
+}
+function hideRestoreDialog(){
+  document.getElementById('restore-dialog').hidden = true;
+  pendingRestore = null;
+}
+function confirmRestore(){
+  if(!pendingRestore) return hideRestoreDialog();
+  const st = pendingRestore;
+  STATE = {
+    history: st.history || {},
+    restDay: st.restDay || {},
+    sets: st.sets || {},
+    startDate: st.startDate || todayStr(),
+    lastBackup: st.lastBackup,
+  };
+  saveState(STATE);
+  hideRestoreDialog();
+  renderAll();
+  selectTab('w'+new Date().getDay());
+  showToast('\u2705 Backup restored');
+}
+
 function renderAll(){
   renderBanner();
+  renderBackupStatus();
   renderTabs();
   viewsEl.innerHTML = '';
 
@@ -854,7 +994,7 @@ function confirmResetProgress(){
   else clear();
 }
 document.addEventListener('keydown', (e) => {
-  if(e.key === 'Escape') hideResetDialog();
+  if(e.key === 'Escape'){ hideResetDialog(); hideRestoreDialog(); }
 });
 
 renderAll();
