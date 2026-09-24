@@ -82,7 +82,7 @@
   .chev{color:var(--ink-dim);transition:transform .2s;flex:0 0 auto;}
   .ex-card.open .chev{transform:rotate(90deg);}
   .ex-detail{max-height:0;overflow:hidden;transition:max-height .25s ease;}
-  .ex-card.open .ex-detail{max-height:400px;}
+  .ex-card.open .ex-detail{max-height:900px;}
   .ex-detail-inner{padding:0 14px 16px;display:flex;gap:14px;border-top:1px solid var(--line);}
   .detail-img{width:96px;height:96px;background:#0d0f10;border:1px solid var(--line);border-radius:12px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;margin-top:14px;}
   .detail-img img{width:78px;height:78px;filter: invert(1) brightness(1.4);}
@@ -93,6 +93,23 @@
   .cue{color:var(--accent);}
   .video-btn{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:7px 12px;border-radius:8px;border:1px solid var(--accent-dim);color:var(--accent);background:transparent;font-size:12px;font-weight:700;text-decoration:none;}
   .video-btn:hover{background:rgba(198,255,94,0.08);}
+
+  .last-time{color:var(--ink);}
+  .ex-right{text-align:right;}
+  .ex-logged{color:var(--accent);font-size:11px;font-weight:700;white-space:nowrap;}
+  .log-panel{padding:0 14px 14px;}
+  .log-toggle{width:100%;padding:9px;background:transparent;border:1px dashed var(--line);color:var(--ink-dim);border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;}
+  .log-body{display:none;}
+  .ex-card.logging .log-toggle{display:none;}
+  .ex-card.logging .log-body{display:block;}
+  .log-hint{font-size:12px;color:var(--amber);margin-bottom:8px;line-height:1.4;}
+  .set-row{display:grid;grid-template-columns:52px 1fr 1fr;gap:8px;align-items:center;margin-bottom:6px;}
+  .set-row .sn{color:var(--ink-dim);font-size:12px;font-weight:700;}
+  .set-row label{display:flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:0 10px;}
+  .set-row input{width:100%;min-width:0;background:transparent;border:none;color:var(--ink);font-size:15px;padding:9px 0;outline:none;}
+  .set-row label:focus-within{border-color:var(--accent-dim);}
+  .set-row .u{color:var(--ink-dim);font-size:11px;}
+  .log-note{color:var(--muted);font-size:11px;margin-top:4px;}
 
   .done-bar{margin-top:22px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:14px;text-align:center;}
   .done-bar p{color:var(--ink-dim);font-size:12px;margin:0 0 10px;}
@@ -319,7 +336,7 @@
 <div id="reset-dialog" class="modal-overlay" hidden onclick="if(event.target===this) hideResetDialog()">
   <div class="modal-card">
     <h3>Clear all progress?</h3>
-    <p>This clears every logged day and any rest-day overrides. This can't be undone.</p>
+    <p>This clears every logged day, any weights you logged, and any rest-day overrides. This can't be undone.</p>
     <div class="modal-actions">
       <button class="modal-btn cancel" onclick="hideResetDialog()">Cancel</button>
       <button class="modal-btn danger" onclick="confirmResetProgress()">Clear data</button>
@@ -376,11 +393,12 @@ function loadState(){
     if(raw){
       const s = JSON.parse(raw);
       s.restDay = s.restDay || {}; // older saved states predate per-week rest overrides
+      s.sets = s.sets || {}; // ...and optional per-set weight logging
       s.startDate = s.startDate || todayStr(); // older saved states predate this too
       return s;
     }
   }catch(e){}
-  const fresh = {history:{}, restDay:{}, startDate: todayStr()};
+  const fresh = {history:{}, restDay:{}, sets:{}, startDate: todayStr()};
   saveState(fresh);
   return fresh;
 }
@@ -487,16 +505,114 @@ function videoSearchUrl(name){
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(name + ' exercise proper form');
 }
 
-function exerciseCard(ex){
+// ---- Optional per-set logging -------------------------------------------
+// STATE.sets[date][exerciseName] = [{w:'40', r:'8'}, ...]. Keyed by name so
+// an exercise shared by two days (e.g. Lateral Raises) shares one history.
+// Nothing here is required: "Mark day done" works the same with or without it.
+
+function escAttr(v){ return String(v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// Top of the prescribed rep range ('6–8' -> 8, '10 / leg' -> 10); null for
+// timed or max-rep work, where "add weight" advice doesn't apply.
+function repTarget(reps){
+  if(/sec|max/i.test(reps)) return null;
+  const range = String(reps).match(/(\d+)\s*[–-]\s*(\d+)/);
+  if(range) return +range[2];
+  const single = String(reps).match(/\d+/);
+  return single ? +single[0] : null;
+}
+
+function filledSets(list){ return (list||[]).filter(x => x && x.r); }
+
+// Most recent logged session for this exercise strictly before `beforeDate`.
+function lastSession(name, beforeDate){
+  const dates = Object.keys(STATE.sets).filter(ds => ds < beforeDate).sort().reverse();
+  for(const ds of dates){
+    const sets = filledSets(STATE.sets[ds][name]);
+    if(sets.length) return {date: ds, sets};
+  }
+  return null;
+}
+
+function fmtSets(sets){
+  return sets.map(x => (x.w ? x.w+'×' : '') + x.r).join(', ');
+}
+
+function progressHint(ex, last){
+  if(!last) return '';
+  const target = repTarget(ex.reps);
+  const hitAll = target && last.sets.length >= ex.sets && last.sets.every(x => +x.r >= target);
+  if(hitAll && last.sets.some(x => x.w)){
+    return `You hit ${target} reps on every set last time, so add 2.5–5 kg today.`;
+  }
+  return `Last time: ${fmtSets(last.sets)}. Try to beat one of those numbers.`;
+}
+
+function loggedBadge(ex){
+  const n = filledSets((STATE.sets[todayStr()]||{})[ex.name]).length;
+  return n ? `&#10003; ${n}/${ex.sets}` : '';
+}
+
+function logPanel(ex){
+  const today = todayStr();
+  const mine = (STATE.sets[today]||{})[ex.name] || [];
+  const last = lastSession(ex.name, today);
+  const prev = last ? last.sets : [];
+  let rows = '';
+  for(let i=0; i<ex.sets; i++){
+    const cur = mine[i] || {};
+    const ph = prev[i] || prev[prev.length-1] || {};
+    rows += `<div class="set-row">
+      <span class="sn">Set ${i+1}</span>
+      <label><input type="text" inputmode="decimal" placeholder="${escAttr(ph.w||'')}" value="${escAttr(cur.w||'')}" oninput="logSet(this,${i},'w')" aria-label="Set ${i+1} weight"><span class="u">kg</span></label>
+      <label><input type="text" inputmode="numeric" placeholder="${escAttr(ph.r||'')}" value="${escAttr(cur.r||'')}" oninput="logSet(this,${i},'r')" aria-label="Set ${i+1} reps"><span class="u">reps</span></label>
+    </div>`;
+  }
+  const hint = progressHint(ex, last);
+  return `<div class="log-panel">
+    <button class="log-toggle" onclick="this.closest('.ex-card').classList.add('logging')">+ Log weights (optional)</button>
+    <div class="log-body">
+      ${hint ? `<div class="log-hint">${hint}</div>` : ''}
+      ${rows}
+      <div class="log-note">Grey numbers are last time's. Leave kg empty for bodyweight.</div>
+    </div>
+  </div>`;
+}
+
+function logSet(input, i, field){
+  const card = input.closest('.ex-card');
+  const name = card.dataset.name;
+  const today = todayStr();
+  const v = input.value.trim().replace(',', '.');
+  const day = STATE.sets[today] = STATE.sets[today] || {};
+  const list = day[name] = day[name] || [];
+  while(list.length <= i) list.push({});
+  list[i] = Object.assign({}, list[i], {[field]: v});
+  if(!list.some(x => x.w || x.r)) delete day[name];
+  if(!Object.keys(day).length) delete STATE.sets[today];
+  saveState(STATE);
+  const ex = PLAN.days.flatMap(d => d.exercises).find(e => e.name === name);
+  if(ex) card.querySelector('.ex-logged').innerHTML = loggedBadge(ex);
+}
+
+// opts.log: main lifts get the optional log panel on today's tab, and a
+// "last time" line on every tab. Core finishers stay plain.
+function exerciseCard(ex, opts){
+  opts = opts || {};
+  const last = opts.log ? lastSession(ex.name, opts.isToday ? todayStr() : '9999') : null;
+  const hasToday = opts.isToday && filledSets((STATE.sets[todayStr()]||{})[ex.name]).length;
   return `
-  <div class="ex-card">
+  <div class="ex-card${hasToday ? ' logging' : ''}" data-name="${escAttr(ex.name)}">
     <div class="ex-row" onclick="this.parentElement.classList.toggle('open')">
       <div class="thumb"><img src="${icon(ex.icon)}"></div>
       <div class="ex-info">
         <div class="ex-name">${ex.name}</div>
         <div class="ex-equip">${ex.equip}</div>
       </div>
-      <div class="ex-sets">${ex.sets}&times;${ex.reps}</div>
+      <div class="ex-right">
+        <div class="ex-sets">${ex.sets}&times;${ex.reps}</div>
+        ${opts.log && opts.isToday ? `<div class="ex-logged">${loggedBadge(ex)}</div>` : ''}
+      </div>
       <div class="chev">&#9656;</div>
     </div>
     <div class="ex-detail"><div class="ex-detail-inner">
@@ -504,11 +620,14 @@ function exerciseCard(ex){
       <div class="detail-text">
         <div class="lbl">Target weight</div>
         <div class="val">${ex.weight}</div>
+        ${last ? `<div class="lbl">Last time (${last.date.slice(5)})</div><div class="val last-time">${fmtSets(last.sets)}</div>` : ''}
         <div class="lbl">Form cue</div>
         <div class="val cue">${ex.cue}</div>
         <a class="video-btn" href="${videoSearchUrl(ex.name)}" target="_blank" rel="noopener noreferrer">&#9654; Watch video</a>
       </div>
-    </div></div>
+    </div>
+    ${opts.log && opts.isToday ? logPanel(ex) : ''}
+    </div>
   </div>`;
 }
 
@@ -541,7 +660,7 @@ function dayView(d, date){
   <div class="fixed-row"><div><div class="t">Light cardio + joint mobility</div><div class="d">Raise heart rate gently, mobilize the joints you'll use today</div></div></div>`;
 
   html += `<div class="block-label">Main Lifts</div>`;
-  d.exercises.forEach(ex => html += exerciseCard(ex));
+  d.exercises.forEach(ex => html += exerciseCard(ex, {log:true, isToday}));
 
   html += `<div class="block-label">Core Finisher (5 min)</div>`;
   PLAN.core.forEach(ex => html += exerciseCard(ex));
@@ -638,7 +757,7 @@ function hideResetDialog(){ document.getElementById('reset-dialog').hidden = tru
 function confirmResetProgress(){
   hideResetDialog();
   const clear = () => {
-    STATE = {history:{}, restDay:{}, startDate: todayStr()};
+    STATE = {history:{}, restDay:{}, sets:{}, startDate: todayStr()};
     saveState(STATE);
     renderAll();
     selectTab('w'+new Date().getDay());
